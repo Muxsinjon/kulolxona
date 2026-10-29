@@ -5,6 +5,7 @@ window.PotEngine = (() => {
   const { clays: CLAYS, finishes: FINISH, N } = window.KData;
   const TEX = 2048, PART_TEX = 512;
   const SEG = 128, M = 260, RIM_PTS = 9, FLOOR_PTS = 18;
+  const PROXY_M = 66, PROXY_SEG = 48;
   const MIN_R = 0.08, MAX_R = 3.4, BEVEL = 0.05;
   const PARTS = ['pot', 'handle', 'spout', 'lid'];
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -33,14 +34,64 @@ window.PotEngine = (() => {
     const c = new THREE.Color(hex);
     return `rgba(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0},${a})`;
   }
-  function speckle(g, x, y, w, h, fleck, rand, density) {
-    const n = Math.floor(w * h * density);
-    for (let i = 0; i < n; i++) {
-      g.globalAlpha = rand() * 0.3;
-      g.fillStyle = rand() < 0.7 ? fleck : '#ffffff';
-      g.fillRect(x + rand() * w, y + rand() * h, 1.6, 1.6);
+  // Clay flecks: one pre-drawn tile used as a pattern (thousands of fillRects per dip were the slow part).
+  let speckTile = null;
+  const crackleCache = {};
+  function speckle(g, x, y, w, h) {
+    if (!speckTile) {
+      speckTile = canvas2d(512);
+      const t = speckTile.getContext('2d'), rand = rng(5);
+      for (let i = 0; i < (512 * 512) / 300; i++) {
+        t.globalAlpha = rand() * 0.3;
+        t.fillStyle = rand() < 0.7 ? '#2a1a10' : '#ffffff';
+        t.fillRect(rand() * 512, rand() * 512, 1.6, 1.6);
+      }
     }
-    g.globalAlpha = 1;
+    g.save();
+    g.fillStyle = g.createPattern(speckTile, 'repeat');
+    g.fillRect(x, y, w, h);
+    g.restore();
+  }
+
+  // Lathe geometry with fixed topology whose vertices are rewritten in place, with normals taken
+  // straight from the profile. Much cheaper than a new LatheGeometry + computeVertexNormals per frame.
+  function makeLathe(n, segs) {
+    const g = new THREE.BufferGeometry(), count = (segs + 1) * n;
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+    const uv = new Float32Array(count * 2), idx = [];
+    for (let i = 0; i <= segs; i++) for (let j = 0; j < n; j++) { const k = (i * n + j) * 2; uv[k] = i / segs; uv[k + 1] = j / (n - 1); }
+    for (let i = 0; i < segs; i++) {
+      for (let j = 0; j < n - 1; j++) {
+        const a = i * n + j, b = (i + 1) * n + j, c = (i + 1) * n + j + 1, d = i * n + j + 1;
+        idx.push(a, b, d, c, d, b);
+      }
+    }
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    const sin = new Float32Array(segs + 1), cos = new Float32Array(segs + 1);
+    for (let i = 0; i <= segs; i++) { const a = (i % segs) / segs * Math.PI * 2; sin[i] = Math.sin(a); cos[i] = Math.cos(a); }
+    g.userData = { n, segs, sin, cos };
+    return g;
+  }
+  // pts: array of Vector2 (r, y) of length n, or a picker (j) => Vector2
+  function updateLathe(g, pick) {
+    const { n, segs, sin, cos } = g.userData;
+    const P = g.attributes.position.array, Nm = g.attributes.normal.array;
+    for (let j = 0; j < n; j++) {
+      const p = pick(j), a = pick(Math.max(j - 1, 0)), b = pick(Math.min(j + 1, n - 1));
+      const tr = b.x - a.x, ty = b.y - a.y, l = Math.hypot(tr, ty) || 1;
+      const nr = ty / l, ny = -tr / l;           // outward for a profile that runs up the outside
+      for (let i = 0; i <= segs; i++) {
+        const k = (i * n + j) * 3;
+        P[k] = p.x * sin[i]; P[k + 1] = p.y; P[k + 2] = p.x * cos[i];
+        Nm[k] = nr * sin[i]; Nm[k + 1] = ny; Nm[k + 2] = nr * cos[i];
+      }
+    }
+    g.attributes.position.needsUpdate = true;
+    g.attributes.normal.needsUpdate = true;
+    g.boundingSphere = null;
+    g.boundingBox = null;
   }
 
   class PotEngine {
@@ -66,17 +117,22 @@ window.PotEngine = (() => {
       this.spinner.add(this.potGroup);
       this._clayMaterial();
 
+      this.tex = opts.tex || TEX;
       this.parts = {};
       for (const name of PARTS) {
-        const paint = this._paintable(name === 'pot' ? TEX : PART_TEX);
+        const paint = this._paintable(name === 'pot' ? this.tex : PART_TEX);
         const glaze = new THREE.MeshPhysicalMaterial({ map: paint.tex, side: THREE.DoubleSide, roughness: 0.88, color: 0xdbdbdb });
-        const mesh = new THREE.Mesh(new THREE.BufferGeometry(), glaze);
+        const mesh = new THREE.Mesh(name === 'pot' ? makeLathe(M, SEG) : new THREE.BufferGeometry(), glaze);
         mesh.castShadow = mesh.receiveShadow = true;
         mesh.userData.part = name;
         mesh.visible = name === 'pot';
         this.potGroup.add(mesh);
         this.parts[name] = { name, paint, glaze, mesh, meta: { len: 1, r: 0.1 } };
       }
+      // invisible low-poly copy of the pot used for mouse picking (the full mesh has ~66k triangles)
+      this.proxy = new THREE.Mesh(makeLathe(PROXY_M, PROXY_SEG), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      this.proxy.visible = false;
+      this.potGroup.add(this.proxy);
       this._highlights();
       this._marker();
 
@@ -193,7 +249,7 @@ window.PotEngine = (() => {
     }
     _highlights() {
       const mk = (color, opacity) => {
-        const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
+        const m = new THREE.Mesh(makeLathe(40, 96), new THREE.MeshBasicMaterial({
           color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2,
         }));
         m.visible = false; m.renderOrder = 2;
@@ -223,7 +279,7 @@ window.PotEngine = (() => {
       this.selBand = null;
       this.applyFinish();
     }
-    markShape() { this.shapeDirty = true; this.paintDirty = true; }
+    markShape() { this.shapeDirty = true; this.paintDirty = true; this._hoverKey = null; }
     markPaint() { this.paintDirty = true; }
 
     drawClay() {
@@ -353,7 +409,7 @@ window.PotEngine = (() => {
       const sc = lerp(z[0], z[1], op.a);
       return [clamp(sc - op.h / 2, z[0], z[1]), clamp(sc + op.h / 2, z[0], z[1])];
     }
-    rows(s0, s1, S = TEX) {
+    rows(s0, s1, S = this.tex) {
       const L = this.prof.L;
       return [Math.floor((1 - s1 / L) * S), Math.ceil((1 - s0 / L) * S)];
     }
@@ -367,7 +423,9 @@ window.PotEngine = (() => {
 
     rebuild() {
       this.buildProfile();
-      this._setGeo('pot', new THREE.LatheGeometry(this.prof.pts, SEG));
+      const pts = this.prof.pts;
+      updateLathe(this.parts.pot.mesh.geometry, (j) => pts[j]);
+      updateLathe(this.proxy.geometry, (j) => pts[Math.round((j * (M - 1)) / (PROXY_M - 1))]);
       for (const n of ['handle', 'spout', 'lid']) {
         const on = this.hasPart(n);
         this.parts[n].mesh.visible = on;
@@ -443,23 +501,18 @@ window.PotEngine = (() => {
     }
 
     // a thin shell following the profile between s0 and s1, used to highlight a band
-    _shellGeo(s0, s1) {
-      const n = Math.max(3, Math.ceil(((s1 - s0) / this.prof.L) * M) + 2);
-      const pts = [];
-      const off = 0.012;
-      for (let k = 0; k <= n; k++) {
-        const s = lerp(s0, s1, k / n);
+    // a thin shell floating just off the surface between s0 and s1
+    _showShell(mesh, range) {
+      if (!range || range[1] - range[0] < 1e-3) { mesh.visible = false; return; }
+      const [s0, s1] = range, n = mesh.geometry.userData.n, off = 0.012, pts = [];
+      for (let k = 0; k < n; k++) {
+        const s = lerp(s0, s1, k / (n - 1));
         const f = clamp(s / this.prof.L, 0, 1) * (M - 1), i = Math.min(Math.floor(f), M - 2);
         const a = this.prof.pts[i], b = this.prof.pts[i + 1], t = f - i;
         const tx = b.x - a.x, ty = b.y - a.y, l = Math.hypot(tx, ty) || 1;
         pts.push(new THREE.Vector2(Math.max(lerp(a.x, b.x, t) + (ty / l) * off, 0), lerp(a.y, b.y, t) - (tx / l) * off));
       }
-      return new THREE.LatheGeometry(pts, 96);
-    }
-    _showShell(mesh, range) {
-      if (!range || range[1] - range[0] < 1e-3) { mesh.visible = false; return; }
-      mesh.geometry.dispose();
-      mesh.geometry = this._shellGeo(range[0], range[1]);
+      updateLathe(mesh.geometry, (j) => pts[j]);
       mesh.visible = true;
     }
     select(op) { this.selBand = op; this._updateSel(); }
@@ -484,7 +537,7 @@ window.PotEngine = (() => {
       if (h <= 0) return;
       const b = P.bctx;
       b.globalAlpha = 1; b.fillStyle = color; b.fillRect(0, y0, S, h);
-      speckle(b, 0, y0, S, h, fleck, rand, S > 1000 ? 1 / 420 : 1 / 260);
+      speckle(b, 0, y0, S, h);
       if (extra) extra(b);
       P.ctx.globalAlpha = 1;
       P.ctx.drawImage(P.base, 0, y0, S, h, 0, y0, S, h);
@@ -503,7 +556,7 @@ window.PotEngine = (() => {
             grad.addColorStop(0, 'rgba(0,0,0,0)');
             grad.addColorStop(0.5, rgba(clay.bisque, 0.4));
             grad.addColorStop(1, 'rgba(0,0,0,0)');
-            b.fillStyle = grad; b.fillRect(0, y0 - 8, TEX, y1 - y0 + 16);
+            b.fillStyle = grad; b.fillRect(0, y0 - 8, pot.size, y1 - y0 + 16);
           };
           if (part === 'all') this._fill(pot, null, op.c, fleck, rand, rimBreak);
           else if (part === 'outside') this._fill(pot, this.rows(0, sMid), op.c, fleck, rand);
@@ -519,14 +572,15 @@ window.PotEngine = (() => {
           if (!r) break;
           const [y0, y1] = this.rows(r[0], r[1]);
           pot.ctx.fillStyle = op.c;
-          pot.ctx.fillRect(0, y0, TEX, Math.max(2, y1 - y0));
+          pot.ctx.fillRect(0, y0, pot.size, Math.max(2, y1 - y0));
           break;
         }
         case 'stroke': {
           const part = this.parts[op.part];
           if (!part) break;
           const st = this._strokeState(op.part, op.b, op.c, rand);
-          for (let k = 0; k < op.p.length; k += 4) this._strokeTo(st, op.p[k], op.p[k + 1], op.p[k + 2], op.p[k + 3]);
+          const k = op.part === 'pot' ? this.tex / TEX : 1;   // pot strokes are stored in full-size texture pixels
+          for (let q = 0; q < op.p.length; q += 4) this._strokeTo(st, op.p[q] * k, op.p[q + 1] * k, op.p[q + 2] * k, op.p[q + 3] * k);
           break;
         }
         case 'sign': this._sign(pot, op); break;
@@ -592,13 +646,20 @@ window.PotEngine = (() => {
       g.restore();
     }
     _crackle(P, rand) {
-      const g = P.ctx, S = P.size, n = S > 1000 ? 1500 : 260;
+      // the crackle never changes for a given texture size, so it is drawn once and stamped from then on
+      const S = P.size;
+      crackleCache[S] = crackleCache[S] || this._drawCrackle(S, rand);
+      P.ctx.drawImage(crackleCache[S], 0, 0);
+    }
+    _drawCrackle(S, rand) {
+      const c = canvas2d(S), g = c.getContext('2d'), n = Math.round(1500 * (S / TEX) ** 2) + 120;
       g.save();
-      g.lineWidth = S > 1000 ? 1.1 : 0.7;
+      g.lineWidth = Math.max(0.7, 1.1 * S / TEX);
       g.strokeStyle = 'rgba(12,40,55,0.15)';
+      g.beginPath();                        // one path, one stroke: far cheaper than stroking each crack
       for (let i = 0; i < n; i++) {
         let x = rand() * S, y = rand() * S, a = rand() * Math.PI * 2;
-        g.beginPath(); g.moveTo(x, y);
+        g.moveTo(x, y);
         const steps = 3 + ((rand() * 6) | 0);
         for (let k = 0; k < steps; k++) {
           a += (rand() - 0.5) * 1.4;
@@ -606,9 +667,10 @@ window.PotEngine = (() => {
           x += Math.cos(a) * len; y += Math.sin(a) * len;
           g.lineTo(x, y);
         }
-        g.stroke();
       }
+      g.stroke();
       g.restore();
+      return c;
     }
 
     // ------------------------------------------------------------ brush
@@ -682,7 +744,8 @@ window.PotEngine = (() => {
         this.stroke = { part: hit.part, op, st: this._strokeState(hit.part, op.b, op.c, rng(Date.now() & 0xffff)) };
       }
       if (this._strokeTo(this.stroke.st, x, y, rx, ry)) {
-        this.stroke.op.p.push(Math.round(x), Math.round(y), Math.round(rx * 10) / 10, Math.round(ry * 10) / 10);
+        const k = hit.part === 'pot' ? TEX / this.tex : 1;
+        this.stroke.op.p.push(Math.round(x * k), Math.round(y * k), Math.round(rx * k * 10) / 10, Math.round(ry * k * 10) / 10);
       }
       P.tex.needsUpdate = true;
     }
@@ -728,16 +791,22 @@ window.PotEngine = (() => {
     _setPointer(e) {
       const r = this.canvas.getBoundingClientRect();
       this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      this.moved = true;
     }
     _hit() {
+      if (!this.prof) return null;
       this.raycaster.setFromCamera(this.pointer, this.camera);
-      const targets = PARTS.map((n) => this.parts[n].mesh).filter((m) => m.visible);
+      // the body is picked on the low-poly proxy; handle, spout and lid are small enough to test directly
+      const targets = [this.proxy, ...['handle', 'spout', 'lid'].map((n) => this.parts[n].mesh).filter((m) => m.visible)];
       const hit = this.raycaster.intersectObjects(targets, false)[0];
       if (!hit || !hit.uv) return null;
-      const part = hit.object.userData.part;
-      const out = { part, uv: hit.uv, point: hit.point };
-      if (part === 'pot') Object.assign(out, { s: hit.uv.y * this.prof.L }, this.sToZone(hit.uv.y * this.prof.L));
-      return out;
+      if (hit.object !== this.proxy) return { part: hit.object.userData.part, uv: hit.uv, point: hit.point };
+      // exact angle from the hit point, so brush dabs land where the cursor is
+      const local = this.potGroup.worldToLocal(hit.point.clone());
+      let u = Math.atan2(local.x, local.z) / (Math.PI * 2);
+      if (u < 0) u += 1;
+      const s = hit.uv.y * this.prof.L;
+      return Object.assign({ part: 'pot', uv: new THREE.Vector2(u, hit.uv.y), point: hit.point, s }, this.sToZone(s));
     }
     _bindPointer() {
       const c = this.canvas;
@@ -823,6 +892,9 @@ window.PotEngine = (() => {
         }
       } else this.marker.visible = false;
       if (this.mode === 'place' && show) {
+        // the pot is round, so a still cursor keeps pointing at the same band: only re-pick on movement
+        if (!this.moved && this._hoverKey && this._hoverKey.endsWith(':' + this.placeH)) return;
+        this.moved = false;
         const h = this._hit();
         if (h && h.part === 'pot') {
           const op = { zone: h.zone, a: h.a, h: this.placeH };
@@ -990,7 +1062,7 @@ window.PotEngine = (() => {
       if (ratio < 0.24) return 'tovoq';
       if (ratio < 0.55) return top > maxR * 0.85 ? (maxR * 2 * (d.cm || 8) < 12 ? 'piyola' : 'kosa') : 'xum';
       if (this.hasPart('spout')) return 'choynak';
-      if (this.hasPart('handle')) return ratio > 1.3 ? 'koza' : 'krujka';
+      if (this.hasPart('handle')) return ratio > 1.12 ? 'koza' : 'krujka';
       if (neckMin < bodyMax * 0.72 && top > neckMin * 1.05) return ratio > 1.1 ? 'guldon' : 'xum';
       if (top < maxR * 0.7) return 'xum';
       if (ratio > 1.25) return 'guldon';

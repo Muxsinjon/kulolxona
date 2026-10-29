@@ -181,7 +181,7 @@ function silhouette(f, W = 88, H = 80) {
 
 let thumbEng = null;
 function renderDesign(d, size = 480, elev, bg = false) {
-  if (!thumbEng) thumbEng = new PotEngine(document.createElement('canvas'), { wheel: false, interactive: false, size: [720, 720], pixelRatio: 1 });
+  if (!thumbEng) thumbEng = new PotEngine(document.createElement('canvas'), { wheel: false, interactive: false, size: [720, 720], pixelRatio: 1, tex: 1024 });
   const e = thumbEng;
   e.surface = 'glaze';
   e.setDesign(d);
@@ -191,26 +191,39 @@ function renderDesign(d, size = 480, elev, bg = false) {
   e.renderNow(elev ?? elevFor(d.form));
   return e.snapshot(size, bg);
 }
+// Thumbnails are rendered one at a time while the browser is idle, encoded asynchronously, and kept
+// in localStorage so later visits show them instantly. Bump THUMB_V when sample designs change.
+const THUMB_V = 2;
 const thumbCache = new Map();
 const thumbQueue = [];
 let thumbBusy = false;
+const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 1200 }) : setTimeout(fn, 60));
 function queueThumb(key, make, img, opts = {}) {
-  if (thumbCache.has(key)) { img.src = thumbCache.get(key); return; }
+  const stored = thumbCache.get(key) || store.get(`kx-thumb-${THUMB_V}:${key}`);
+  if (stored) { thumbCache.set(key, stored); img.src = stored; return; }
   thumbQueue.push({ key, make, img, opts });
   pumpThumbs();
 }
 function pumpThumbs() {
   if (thumbBusy || !thumbQueue.length) return;
   thumbBusy = true;
-  setTimeout(() => {
+  idle(() => {
     const job = thumbQueue.shift();
+    const next = () => { thumbBusy = false; pumpThumbs(); };
+    if (thumbCache.has(job.key)) { job.img.src = thumbCache.get(job.key); next(); return; }
     try {
-      if (!thumbCache.has(job.key)) thumbCache.set(job.key, renderDesign(job.make(), job.opts.size || 480, job.opts.elev).toDataURL('image/png'));
-      job.img.src = thumbCache.get(job.key);
-    } catch (err) { console.error(err); }
-    thumbBusy = false;
-    pumpThumbs();
-  }, 20);
+      renderDesign(job.make(), job.opts.size || 420, job.opts.elev).toBlob((blob) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          thumbCache.set(job.key, reader.result);
+          store.set(`kx-thumb-${THUMB_V}:${job.key}`, reader.result);
+          job.img.src = reader.result;
+          next();
+        };
+        reader.readAsDataURL(blob);
+      }, 'image/webp', 0.9);
+    } catch (err) { console.error(err); next(); }
+  });
 }
 
 // ------------------------------------------------------------------ shared card builders
@@ -427,15 +440,13 @@ const Home = {
     $('#statMotifs').textContent = M.list.length;
     $('#statForms').textContent = D.forms.length - 1;
     // the "ishkor" artwork: a lagan seen from above
-    setTimeout(() => {
-      const art = $('#ishkorArt'), g = art.getContext('2d');
-      const img = renderDesign(D.sampleDesign('lagan_anor'), 900, 1.45, false);
-      g.fillStyle = '#0f2347'; g.fillRect(0, 0, 900, 900);
-      const grad = g.createRadialGradient(450, 450, 100, 450, 450, 450);
-      grad.addColorStop(0, '#2a5bc2'); grad.addColorStop(1, '#0f2347');
-      g.fillStyle = grad; g.fillRect(0, 0, 900, 900);
-      g.drawImage(img, -40, -40, 980, 980);
-    }, 300);
+    const art = $('#ishkorArt'), ag = art.getContext('2d');
+    const grad = ag.createRadialGradient(450, 450, 100, 450, 450, 450);
+    grad.addColorStop(0, '#2a5bc2'); grad.addColorStop(1, '#0f2347');
+    ag.fillStyle = grad; ag.fillRect(0, 0, 900, 900);
+    const plate = new Image();
+    plate.onload = () => ag.drawImage(plate, -40, -40, 980, 980);
+    queueThumb('art:lagan_top', () => D.sampleDesign('lagan_anor'), plate, { size: 900, elev: 1.45 });
     this.render();
   },
   load(i) {
@@ -510,17 +521,17 @@ const About = {
   terms: ['kulol', 'usta', 'charx', 'angob', 'ishkor', 'naqqosh', 'xumdon', 'lagan', 'piyola', 'kosa'],
   init() {
     this.render();
-    setTimeout(() => {
-      const c = $('#aboutArt'), g = c.getContext('2d');
-      const grad = g.createLinearGradient(0, 0, 0, 900);
-      grad.addColorStop(0, '#e9f4f4'); grad.addColorStop(1, '#cfe3e6');
-      g.fillStyle = grad; g.fillRect(0, 0, 700, 900);
-      g.globalAlpha = 0.18;
-      const orn = M.preview('girih', D.PAL.ishkor, 700, 140, 0, '#e9f4f4');
-      for (let y = 0; y < 900; y += 140) g.drawImage(orn, 0, y);
-      g.globalAlpha = 1;
-      g.drawImage(renderDesign(D.sampleDesign('koza_bodom'), 760, 0.25, false), -30, 90, 760, 760);
-    }, 200);
+    const c = $('#aboutArt'), g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 900);
+    grad.addColorStop(0, '#e9f4f4'); grad.addColorStop(1, '#cfe3e6');
+    g.fillStyle = grad; g.fillRect(0, 0, 700, 900);
+    g.globalAlpha = 0.18;
+    const orn = M.preview('girih', D.PAL.ishkor, 700, 140, 0, '#e9f4f4');
+    for (let y = 0; y < 900; y += 140) g.drawImage(orn, 0, y);
+    g.globalAlpha = 1;
+    const jug = new Image();
+    jug.onload = () => g.drawImage(jug, -30, 90, 760, 760);
+    queueThumb('art:koza_side', () => D.sampleDesign('koza_bodom'), jug, { size: 760, elev: 0.25 });
   },
   render() {
     const dl = $('#glossary'); dl.innerHTML = '';
