@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kulolxona · Rishton</title>
+<meta name="description" content="Design your own Rishton pottery in 3D, decorate it with traditional patterns and send it to a master potter.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<header class="site-head">
+  <a href="#/" class="logo">
+    <canvas class="logo-mark" id="logoMark" width="80" height="80"></canvas>
+    <span class="logo-text">Kulolxona<small>Rishton</small></span>
+  </a>
+  <nav class="nav" id="nav">
+    <a href="#/studio" data-i18n="nav_studio"></a>
+    <a href="#/samples" data-i18n="nav_samples"></a>
+    <a href="#/patterns" data-i18n="nav_patterns"></a>
+    <a href="#/masters" data-i18n="nav_masters"></a>
+    <a href="#/about" data-i18n="nav_about"></a>
+    <a href="#/my" data-i18n="nav_my"></a>
+  </nav>
+  <div class="lang" id="lang">
+    <button data-lang="uz">UZ</button><button data-lang="en">EN</button><button data-lang="ru">RU</button>
+  </div>
+  <button class="menu-btn" id="menuBtn" aria-label="Menu"><span></span><span></span><span></span></button>
+</header>
+
+<main id="app">
+
+  <!-- ============================== HOME -->
+  <section class="page" data-route="home">
+    <div class="hero">
+      <div class="hero-text">
+        <div class="eyebrow" data-i18n="hero_eyebrow"></div>
+        <h1 data-i18n-html="hero_title"></h1>
+        <p class="lead" data-i18n="hero_lead"></p>
+        <div class="cta-row">
+          <a class="btn primary lg" href="#/studio" data-i18n="hero_cta"></a>
+          <a class="btn ghost lg" href="#/samples" data-i18n="hero_cta2"></a>
+        </div>
+        <div class="stats">
+          <div><b>800+</b><span data-i18n="stat_years"></span></div>
+          <div><b id="statMotifs">17</b><span data-i18n="stat_motifs"></span></div>
+          <div><b id="statForms">10</b><span data-i18n="stat_forms"></span></div>
+        </div>
+      </div>
+      <div class="hero-stage">
+        <div class="hero-halo"></div>
+        <canvas id="heroCanvas"></canvas>
+        <div class="hero-caption" id="heroCaption"></div>
+        <div class="hero-dots" id="heroDots"></div>
+      </div>
+    </div>
+
+    <div class="ornament" data-ornament="islimi"></div>
+
+    <section class="block">
+      <h2 class="sec-title" data-i18n="how_title"></h2>
+      <div class="how" id="howGrid">
+        <div class="how-card"><canvas data-motif-icon="gul"></canvas><b>1</b><h3 data-i18n="how1_t"></h3><p data-i18n="how1_d"></p></div>
+        <div class="how-card"><canvas data-motif-icon="anor"></canvas><b>2</b><h3 data-i18n="how2_t"></h3><p data-i18n="how2_d"></p></div>
+        <div class="how-card"><canvas data-motif-icon="girih"></canvas><b>3</b><h3 data-i18n="how3_t"></h3><p data-i18n="how3_d"></p></div>
+        <div class="how-card"><canvas data-motif-icon="bodom"></canvas><b>4</b><h3 data-i18n="how4_t"></h3><p data-i18n="how4_d"></p></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="sec-head">
+        <h2 class="sec-title" data-i18n="feat_title"></h2>
+        <a href="#/samples" class="link-more" data-i18n="see_all"></a>
+      </div>
+      <div class="cards" id="homeSamples"></div>
+    </section>
+
+    <section class="block split">
+      <div class="split-art"><canvas id="ishkorArt" width="900" height="900"></canvas></div>
+      <div class="split-text">
+        <div class="eyebrow" data-i18n="ishkor_eyebrow"></div>
+        <h2 class="sec-title" data-i18n="ishkor_title"></h2>
+        <p data-i18n="ishkor_p1"></p>
+        <p data-i18n="ishkor_p2"></p>
+        <a href="#/about" class="btn ghost" data-i18n="read_story"></a>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="sec-head">
+        <h2 class="sec-title" data-i18n="pat_teaser"></h2>
+        <a href="#/patterns" class="link-more" data-i18n="see_all"></a>
+      </div>
+      <div class="pattern-strip" id="homePatterns"></div>
+    </section>
+
+    <section class="block">
+      <div class="sec-head">
+        <h2 class="sec-title" data-i18n="masters_title"></h2>
+        <a href="#/masters" class="link-more" data-i18n="see_all"></a>
+      </div>
+      <div class="masters" id="homeMasters"></div>
+    </section>
+
+    <section class="final-cta">
+      <div class="ornament light" data-ornament="kungura"></div>
+      <h2 data-i18n="final_title"></h2>
+      <p data-i18n="final_p"></p>
+      <a href="#/studio" class="btn light lg" data-i18n="hero_cta"></a>
+    </section>
+  </section>
+
+  <!-- ============================== STUDIO -->
+  <section class="page studio" data-route="studio">
+    <div class="studio-bar">
+      <input id="designName" class="name-input" maxlength="48" data-i18n-ph="ph_name">
+      <div class="bar-actions">
+        <button id="undoBtn" class="icon-btn" data-i18n-title="undo">&#8630;</button>
+        <button id="redoBtn" class="icon-btn" data-i18n-title="redo">&#8631;</button>
+        <span class="sep"></span>
+        <button id="saveBtn" class="btn ghost sm" data-i18n="save"></button>
+        <button id="shareBtn" class="btn ghost sm" data-i18n="share_link"></button>
+        <button id="pngBtn" class="btn ghost sm" data-i18n="download_png"></button>
+        <button id="newBtn" class="btn ghost sm" data-i18n="new_design"></button>
+      </div>
+    </div>
+    <div class="studio-body">
+      <div class="stage" id="stage">
+        <canvas id="studioCanvas"></canvas>
+        <div class="badge" id="formBadge"></div>
+        <div class="dims" id="dims"></div>
+        <div class="hint" id="studioHint"></div>
+        <div class="viewctl">
+          <button data-view="up" data-i18n-title="v_up">&#9650;</button>
+          <button data-view="down" data-i18n-title="v_down">&#9660;</button>
+          <button data-view="in" data-i18n-title="v_in">+</button>
+          <button data-view="out" data-i18n-title="v_out">&minus;</button>
+          <button data-view="flip" class="wide" data-i18n="v_flip"></button>
+        </div>
+        <div class="kiln-glow"><div class="temp"><span id="temp">20</span>&deg;C</div><div class="kiln-label" data-i18n="firing"></div></div>
+      </div>
+
+      <aside class="panel">
+        <nav class="steps" id="studioSteps">
+          <button data-step="shape"><b>1</b><span data-i18n="st_shape"></span></button>
+          <button data-step="decorate"><b>2</b><span data-i18n="st_decorate"></span></button>
+          <button data-step="kiln"><b>3</b><span data-i18n="st_kiln"></span></button>
+          <button data-step="order"><b>4</b><span data-i18n="st_order"></span></button>
+        </nav>
+
+        <div class="panel-body">
+          <!-- SHAPE -->
+          <div data-step-panel="shape">
+            <div class="group">
+              <div class="lbl" data-i18n="forms"></div>
+              <div class="forms" id="formsGrid"></div>
+            </div>
+            <div class="group">
+              <div class="lbl" data-i18n="clay"></div>
+              <div class="chips" id="clayChips"></div>
+            </div>
+            <div class="group">
+              <div class="lbl" data-i18n="hands"></div>
+              <div class="seg" id="toolSeg">
+                <button data-v="shape" data-i18n="t_shape"></button>
+                <button data-v="push" data-i18n="t_push"></button>
+                <button data-v="pull" data-i18n="t_pull"></button>
+                <button data-v="smooth" data-i18n="t_smooth"></button>
+              </div>
+              <label class="slider"><span data-i18n="hand_size"></span><input type="range" id="handSize" min="0.15" max="1.2" step="0.01"></label>
+              <label class="slider"><span data-i18n="pressure"></span><input type="range" id="pressure" min="0.1" max="1" step="0.01"></label>
+            </div>
+            <div class="group">
+              <label class="slider"><span data-i18n="height"></span><input type="range" id="heightIn" min="0.3" max="4" step="0.01"></label>
+              <label class="toggle"><input type="checkbox" id="openIn"><i></i><span data-i18n="open_centre"></span></label>
+              <label class="slider" id="wallRow"><span data-i18n="wall"></span><input type="range" id="wallIn" min="0.06" max="0.35" step="0.005"></label>
+              <div class="toggles3" id="partToggles">
+                <label class="toggle"><input type="checkbox" id="handleIn"><i></i><span data-i18n="handle"></span></label>
+                <label class="toggle"><input type="checkbox" id="spoutIn"><i></i><span data-i18n="spout"></span></label>
+                <label class="toggle"><input type="checkbox" id="lidIn"><i></i><span data-i18n="lid"></span></label>
+              </div>
+            </div>
+            <div class="group">
+              <label class="slider"><span data-i18n="wheel_speed"></span><input type="range" class="spinIn" min="0" max="2" step="0.05"></label>
+              <button id="smoothAll" class="btn ghost sm" data-i18n="smooth_all"></button>
+            </div>
+            <div class="next-row"><button class="btn primary" data-goto="decorate"><span data-i18n="next"></span> &rarr;</button></div>
+          </div>
+
+          <!-- DECORATE -->
+          <div data-step-panel="decorate">
+            <div class="subtabs" id="decTabs">
+              <button data-dtab="patterns" data-i18n="d_patterns"></button>
+              <button data-dtab="brush" data-i18n="d_brush"></button>
+              <button data-dtab="glaze" data-i18n="d_glaze"></button>
+            </div>
+
+            <div data-dpanel="patterns">
+              <p class="tip" id="patTip" data-i18n="pat_tip"></p>
+              <div class="motif-grid" id="motifGrid"></div>
+              <div class="group">
+                <div class="lbl" data-i18n="palette"></div>
+                <div class="palettes" id="paletteRow"></div>
+                <div class="wells" id="wells"></div>
+              </div>
+              <div class="group">
+                <label class="slider"><span data-i18n="band_h"></span><input type="range" id="bandH" min="0.08" max="1.4" step="0.01"></label>
+                <label class="slider"><span data-i18n="repeats"></span><input type="range" id="bandN" min="0" max="36" step="1"><em class="val" id="bandNVal"></em></label>
+                <label class="toggle"><input type="checkbox" id="bandBorder"><i></i><span data-i18n="border"></span></label>
+                <label class="toggle"><input type="checkbox" id="bandBg"><i></i><span data-i18n="band_bg"></span></label>
+              </div>
+              <div class="group">
+                <div class="lbl" data-i18n="quick_place"></div>
+                <div class="chips" id="quickZones">
+                  <button data-qz="outer:0.85" data-i18n="qz_top"></button>
+                  <button data-qz="outer:0.5" data-i18n="qz_body"></button>
+                  <button data-qz="outer:0.12" data-i18n="qz_foot"></button>
+                  <button data-qz="inside:0.12" data-i18n="qz_inrim"></button>
+                  <button data-qz="inside:0.5" data-i18n="qz_inmid"></button>
+                  <button data-qz="inside:0.96" data-i18n="qz_center"></button>
+                </div>
+              </div>
+              <div class="editing" id="editingBar" hidden>
+                <span id="editingLabel"></span>
+                <button class="btn ghost sm" id="editDone" data-i18n="done"></button>
+                <button class="btn danger sm" id="editDelete" data-i18n="delete"></button>
+              </div>
+            </div>
+
+            <div data-dpanel="brush">
+              <div class="seg" id="brushSeg">
+                <button data-v="brush" data-i18n="b_brush"></button>
+                <button data-v="dots" data-i18n="b_dots"></button>
+                <button data-v="sponge" data-i18n="b_sponge"></button>
+                <button data-v="ring" data-i18n="b_ring"></button>
+                <button data-v="wipe" data-i18n="b_wipe"></button>
+              </div>
+              <div class="group">
+                <div class="lbl" data-i18n="colour"></div>
+                <div class="swatches" id="brushColors"></div>
+              </div>
+              <div class="group">
+                <label class="slider"><span data-i18n="brush_size"></span><input type="range" id="brushSize" min="0.03" max="0.5" step="0.005"></label>
+                <label class="slider"><span data-i18n="wheel_speed"></span><input type="range" class="spinIn" min="0" max="2" step="0.05"></label>
+                <p class="tip" data-i18n="brush_tip"></p>
+              </div>
+            </div>
+
+            <div data-dpanel="glaze">
+              <div class="group">
+                <div class="lbl" data-i18n="dip_target"></div>
+                <div class="seg" id="dipSeg">
+                  <button data-v="all" data-i18n="dp_all"></button>
+                  <button data-v="outside" data-i18n="dp_out"></button>
+                  <button data-v="inside" data-i18n="dp_in"></button>
+                  <button data-v="parts" data-i18n="dp_parts"></button>
+                </div>
+                <div class="swatches" id="dipColors"></div>
+                <button id="stripBtn" class="btn ghost sm" data-i18n="strip"></button>
+              </div>
+              <div class="group">
+                <div class="lbl" data-i18n="signature"></div>
+                <p class="tip" data-i18n="sign_tip"></p>
+                <div class="inline">
+                  <input id="signIn" class="text" maxlength="28" data-i18n-ph="ph_sign">
+                  <button id="signBtn" class="btn ghost sm" data-i18n="apply"></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="group layers-wrap">
+              <div class="lbl"><span data-i18n="layers"></span> <em id="layerCount"></em></div>
+              <ol class="layers" id="layers"></ol>
+            </div>
+            <div class="next-row split">
+              <button class="btn ghost" data-goto="shape">&larr; <span data-i18n="st_shape"></span></button>
+              <button class="btn primary" data-goto="kiln"><span data-i18n="next"></span> &rarr;</button>
+            </div>
+          </div>
+
+          <!-- KILN -->
+          <div data-step-panel="kiln">
+            <p class="tip" data-i18n="kiln_tip"></p>
+            <div class="finishes" id="finishGrid"></div>
+            <div class="fired-note" id="firedNote" hidden><span data-i18n="fired_ok"></span> <button class="btn ghost sm" id="unfireBtn" data-i18n="edit_again"></button></div>
+            <div class="next-row split">
+              <button class="btn ghost" data-goto="decorate">&larr; <span data-i18n="st_decorate"></span></button>
+              <button class="btn fire" id="fireBtn" data-i18n="fire"></button>
+            </div>
+            <div class="next-row"><button class="btn primary" data-goto="order" id="toOrder"><span data-i18n="st_order"></span> &rarr;</button></div>
+          </div>
+
+          <!-- ORDER -->
+          <div data-step-panel="order">
+            <p class="tip" data-i18n="order_tip"></p>
+            <div class="group">
+              <div class="lbl" data-i18n="choose_master"></div>
+              <div class="master-pick" id="masterPick"></div>
+            </div>
+            <div class="group">
+              <label class="slider"><span data-i18n="size_cm"></span><input type="range" id="sizeCm" min="6" max="70" step="0.5"><em class="val" id="sizeVal"></em></label>
+              <div class="spec-mini" id="specMini"></div>
+              <label class="field"><span data-i18n="qty"></span><input type="number" id="qty" class="text" min="1" max="500" value="1"></label>
+              <label class="field"><span data-i18n="your_name"></span><input id="custName" class="text" maxlength="60"></label>
+              <label class="field"><span data-i18n="contact"></span><input id="custContact" class="text" maxlength="80" data-i18n-ph="ph_contact"></label>
+              <label class="field"><span data-i18n="notes"></span><textarea id="notes" class="text" rows="3" maxlength="600" data-i18n-ph="ph_notes"></textarea></label>
+              <label class="toggle"><input type="checkbox" id="includeContact" checked><i></i><span data-i18n="include_contact"></span></label>
+            </div>
+            <div class="next-row split">
+              <button class="btn ghost" data-goto="kiln">&larr; <span data-i18n="st_kiln"></span></button>
+              <button class="btn primary" id="sendBtn" data-i18n="send_master"></button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============================== SAMPLES -->
+  <section class="page" data-route="samples">
+    <div class="page-head">
+      <div class="eyebrow" data-i18n="nav_samples"></div>
+      <h1 data-i18n="samples_h"></h1>
+      <p class="lead" data-i18n="samples_p"></p>
+    </div>
+    <div class="ornament" data-ornament="tolqin"></div>
+    <div class="chips filter" id="sampleFilter"></div>
+    <div class="cards" id="samplesGrid"></div>
+  </section>
+
+  <!-- ============================== PATTERNS -->
+  <section class="page" data-route="patterns">
+    <div class="page-head">
+      <div class="eyebrow" data-i18n="nav_patterns"></div>
+      <h1 data-i18n="patterns_h"></h1>
+      <p class="lead" data-i18n="patterns_p"></p>
+    </div>
+    <div class="palettes big" id="patPalettes"></div>
+    <div class="pattern-cards" id="patternsGrid"></div>
+  </section>
+
+  <!-- ============================== MASTERS -->
+  <section class="page" data-route="masters">
+    <div class="page-head">
+      <div class="eyebrow" data-i18n="nav_masters"></div>
+      <h1 data-i18n="masters_h"></h1>
+      <p class="lead" data-i18n="masters_p"></p>
+    </div>
+    <div class="ornament" data-ornament="girih"></div>
+    <div class="masters big" id="mastersGrid"></div>
+    <div class="how-order">
+      <h2 class="sec-title" data-i18n="howorder_t"></h2>
+      <ol>
+        <li data-i18n="howorder_1"></li>
+        <li data-i18n="howorder_2"></li>
+        <li data-i18n="howorder_3"></li>
+        <li data-i18n="howorder_4"></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============================== ABOUT -->
+  <section class="page" data-route="about">
+    <div class="page-head">
+      <div class="eyebrow" data-i18n="nav_about"></div>
+      <h1 data-i18n="about_h"></h1>
+      <p class="lead" data-i18n="about_lead"></p>
+    </div>
+    <div class="about-grid">
+      <article>
+        <h2 data-i18n="about_t1"></h2>
+        <p data-i18n="about_p1"></p>
+        <h2 data-i18n="about_t2"></h2>
+        <p data-i18n="about_p2"></p>
+        <h2 data-i18n="about_t3"></h2>
+        <p data-i18n="about_p3"></p>
+      </article>
+      <aside class="about-art"><canvas id="aboutArt" width="700" height="900"></canvas></aside>
+    </div>
+    <div class="ornament" data-ornament="kungura"></div>
+    <h2 class="sec-title center" data-i18n="process_t"></h2>
+    <ol class="process">
+      <li><b>01</b><h3 data-i18n="pr1_t"></h3><p data-i18n="pr1_d"></p></li>
+      <li><b>02</b><h3 data-i18n="pr2_t"></h3><p data-i18n="pr2_d"></p></li>
+      <li><b>03</b><h3 data-i18n="pr3_t"></h3><p data-i18n="pr3_d"></p></li>
+      <li><b>04</b><h3 data-i18n="pr4_t"></h3><p data-i18n="pr4_d"></p></li>
+      <li><b>05</b><h3 data-i18n="pr5_t"></h3><p data-i18n="pr5_d"></p></li>
+      <li><b>06</b><h3 data-i18n="pr6_t"></h3><p data-i18n="pr6_d"></p></li>
+    </ol>
+    <div class="glossary">
+      <h2 class="sec-title" data-i18n="gloss_t"></h2>
+      <dl id="glossary"></dl>
+    </div>
+  </section>
+
+  <!-- ============================== MY WORK -->
+  <section class="page" data-route="my">
+    <div class="page-head">
+      <div class="eyebrow" data-i18n="nav_my"></div>
+      <h1 data-i18n="my_h"></h1>
+    </div>
+    <div class="subtabs wide" id="myTabs">
+      <button data-mtab="designs" data-i18n="my_designs"></button>
+      <button data-mtab="orders" data-i18n="my_orders"></button>
+    </div>
+    <div data-mpanel="designs">
+      <div class="my-actions">
+        <a href="#/studio" class="btn primary sm" data-i18n="new_design"></a>
+        <label class="btn ghost sm file-btn"><span data-i18n="import"></span><input type="file" id="importIn" accept=".json,application/json"></label>
+      </div>
+      <div class="cards" id="myDesigns"></div>
+      <p class="empty" id="myDesignsEmpty" data-i18n="empty_designs"></p>
+    </div>
+    <div data-mpanel="orders">
+      <div class="orders" id="myOrders"></div>
+      <p class="empty" id="myOrdersEmpty" data-i18n="empty_orders"></p>
+    </div>
+  </section>
+
+  <!-- ============================== VIEW (shared link / master view) -->
+  <section class="page view" data-route="view">
+    <div class="view-body">
+      <div class="view-stage"><canvas id="viewCanvas"></canvas>
+        <div class="viewctl"><button data-vview="up">&#9650;</button><button data-vview="down">&#9660;</button><button data-vview="flip" class="wide" data-i18n="v_flip"></button></div>
+      </div>
+      <div class="view-sheet" id="viewSheet"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="ornament light" data-ornament="islimi"></div>
+  <div class="foot-inner">
+    <div class="foot-brand"><b>Kulolxona</b><span data-i18n="foot_tag"></span></div>
+    <nav>
+      <a href="#/studio" data-i18n="nav_studio"></a>
+      <a href="#/samples" data-i18n="nav_samples"></a>
+      <a href="#/patterns" data-i18n="nav_patterns"></a>
+      <a href="#/masters" data-i18n="nav_masters"></a>
+      <a href="#/about" data-i18n="nav_about"></a>
+    </nav>
+    <p class="foot-note" data-i18n="foot_note"></p>
+  </div>
+</footer>
+
+<div class="modal" id="modal" hidden><div class="modal-card" id="modalCard"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/data.js"></script>
+<script src="js/motifs.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
