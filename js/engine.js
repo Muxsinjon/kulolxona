@@ -88,6 +88,7 @@ window.PotEngine = (() => {
       this.placeH = 0.35;
       this.cam = { elev: 0.4, targetElev: 0.4, zoom: 1, dist: 9, ty: 0.8 };
       this.flip = 0; this.flipTarget = 0;
+      this.morph = null; this.pop = null;
       this.pointer = new THREE.Vector2(9, 9);
       this.raycaster = new THREE.Raycaster();
       this.down = false; this.inside = false; this.drag = null; this.lastManual = 0;
@@ -215,6 +216,7 @@ window.PotEngine = (() => {
     // ------------------------------------------------------------ design
     setDesign(d) {
       this.d = d;
+      this.morph = null;
       this.drawClay();
       this.shapeDirty = true;
       this.paintDirty = true;
@@ -862,18 +864,51 @@ window.PotEngine = (() => {
       }
     }
 
+    // ease the current shape into a new one (used when switching forms)
+    morphTo(target, dur = 0.7, done) {
+      const d = this.d;
+      this.morph = {
+        t: 0, dur, done, fromR: d.R.slice(), toR: target.R.slice(),
+        from: [d.height, d.wall], to: [target.height, target.wall],
+      };
+    }
+    _morphTick(dt) {
+      const m = this.morph, d = this.d;
+      m.t += dt;
+      const p = Math.min(m.t / m.dur, 1);
+      const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      for (let i = 0; i < N; i++) d.R[i] = +lerp(m.fromR[i], m.toR[i], e).toFixed(4);
+      d.height = lerp(m.from[0], m.to[0], e);
+      d.wall = lerp(m.from[1], m.to[1], e);
+      this.markShape();
+      this.cb.shapeChange?.();
+      if (p >= 1) { this.morph = null; m.done?.(); }
+    }
+    // a small "settle onto the wheel" entrance for a newly shown piece
+    popIn() { this.pop = 0; }
+    _popTick(dt) {
+      this.pop = Math.min(1, this.pop + dt / 0.8);
+      const e = 1 - Math.pow(1 - this.pop, 3);
+      this.potGroup.scale.setScalar(0.86 + 0.14 * e);
+      this.spinner.rotation.y += (1 - e) * dt * 4;
+      if (this.pop >= 1) this.pop = null;
+    }
+
     frame(now) {
       const dt = clamp((now - (this.last || now)) / 1000, 0, 0.05);
       this.last = now;
       if (!this.d) return;
+      if (this.morph) this._morphTick(dt);
       if (this.shapeDirty) this.rebuild();
-      if (this.paintDirty) this.repaint();
+      // wet clay hides the decoration, so the (expensive) repaint can wait until the glaze is visible
+      if (this.paintDirty && this.surface === 'glaze') this.repaint();
       if (now - this.lastManual > 1500 && !this.drag) this.spinner.rotation.y += this.spin * Math.PI * 2 * dt;
       if (this.down && !this.drag) {
         if (this.mode === 'shape') this._shapeTick(dt);
         else if (this.mode === 'paint') this._paintTick();
       }
       if (this.firing) this._fireTick(dt);
+      if (this.pop !== null) this._popTick(dt);
       this._flipTick(dt);
       this._hoverTick();
       this._camTick(dt);

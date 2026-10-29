@@ -46,6 +46,8 @@ const modal = {
   close() { $('#modal').hidden = true; document.body.classList.remove('lock'); },
 };
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') modal.close(); });
+// thumbnails fade in once they have loaded (load/error don't bubble, so listen in the capture phase)
+for (const type of ['load', 'error']) document.addEventListener(type, (e) => { if (e.target.tagName === 'IMG') e.target.classList.add('in'); }, true);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#modal').hidden) modal.close(); });
 
 function colorName(hex) {
@@ -437,12 +439,21 @@ const Home = {
     this.render();
   },
   load(i) {
+    const first = this.idx === undefined;
     this.idx = i;
-    const id = this.list[i], d = D.sampleDesign(id);
-    this.eng.setDesign(d);
-    this.eng.cam.targetElev = elevFor(d.form);
-    $('#heroCaption').textContent = t('s_' + id);
     $$('#heroDots button').forEach((b, k) => b.classList.toggle('on', k === i));
+    const stage = $('.hero-stage');
+    // fade out, swap the piece while it is invisible (the texture bake can stutter), then fade back in
+    stage.classList.add('swapping');
+    clearTimeout(this._swapT);
+    this._swapT = setTimeout(() => {
+      const id = this.list[this.idx], d = D.sampleDesign(id);
+      this.eng.setDesign(d);
+      this.eng.renderNow(elevFor(d.form));
+      this.eng.popIn();
+      $('#heroCaption').textContent = t('s_' + id);
+      setTimeout(() => stage.classList.remove('swapping'), 40);
+    }, first ? 0 : 380);
   },
   render() {
     const hs = $('#homeSamples'); hs.innerHTML = '';
@@ -1023,9 +1034,11 @@ const Studio = {
   setForm(id) {
     this.pushUndo();
     const n = D.makeDesign(id);
-    for (const k of ['form', 'R', 'height', 'wall', 'open', 'handle', 'spout', 'lid', 'cm']) this.d[k] = n[k];
-    this.eng.markShape();
-    this.syncShape(); this.infoSoon(); this.saveSoon();
+    for (const k of ['form', 'open', 'handle', 'spout', 'lid', 'cm']) this.d[k] = n[k];
+    this.syncShape();
+    $('#heightIn').value = n.height;
+    $('#wallIn').value = n.wall;
+    this.eng.morphTo(n, 0.7, () => { this.syncShape(); this.info(); this.saveSoon(); });
   },
   syncShape() {
     const d = this.d;
@@ -1239,18 +1252,32 @@ const Studio = {
 
 const routes = { home: Home, studio: Studio, samples: Samples, patterns: Patterns, masters: Masters, about: About, my: My, view: View };
 const inited = {};
+let current = null;
+const canTransition = typeof document.startViewTransition === 'function' && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (canTransition) document.documentElement.classList.add('vt');
 function route() {
   const h = location.hash.replace(/^#\/?/, '');
   const [name, ...rest] = h.split('/');
   const r = routes[name] ? name : 'home';
-  $$('.page').forEach((p) => p.classList.toggle('show', p.dataset.route === r));
-  $$('#nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + r));
-  document.body.className = 'route-' + r;
-  $('#nav').classList.remove('open');
-  document.querySelector('.popover')?.remove();
-  if (!inited[r]) { inited[r] = true; routes[r].init(); }
-  routes[r].show?.(rest.join('/'));
-  window.scrollTo(0, 0);
+  const swap = () => {
+    $$('.page').forEach((p) => p.classList.toggle('show', p.dataset.route === r));
+    $$('#nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + r));
+    document.body.className = 'route-' + r;
+    $('#nav').classList.remove('open');
+    document.querySelector('.popover')?.remove();
+    if (!inited[r]) { inited[r] = true; routes[r].init(); }
+    routes[r].show?.(rest.join('/'));
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  };
+  // crossfade between pages; staying on the same page (e.g. another shared link) just swaps
+  if (canTransition && current && current !== r) {
+    // the transition waits for the next painted frame; never let a throttled tab hold the page change back
+    let done = false;
+    const once = () => { if (!done) { done = true; swap(); } };
+    document.startViewTransition(once);
+    setTimeout(once, 300);
+  } else swap();
+  current = r;
 }
 window.addEventListener('hashchange', route);
 $('#menuBtn').onclick = () => $('#nav').classList.toggle('open');
