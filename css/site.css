@@ -482,6 +482,8 @@ textarea.text { resize: vertical; }
 .foot-inner { max-width: 1240px; margin: 0 auto; padding: 36px 28px 44px; display: grid; grid-template-columns: 1fr auto; gap: 16px 32px; }
 .foot-brand b { font: 700 30px var(--display); color: #fff; display: block; }
 .foot-brand span { font-size: 13px; opacity: .8; }
+.foot-mail { display: block; width: fit-content; margin-top: 10px; font-weight: 700; font-size: 14px; color: #7fd8d3; text-decoration: none; }
+.foot-mail:hover { text-decoration: underline; }
 .site-foot nav { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
 .site-foot nav a { text-decoration: none; font-weight: 600; font-size: 14px; }
 .foot-note { grid-column: 1 / -1; font-size: 12px; opacity: .6; margin: 0; }
